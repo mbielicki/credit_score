@@ -51,6 +51,79 @@ resource "google_secret_manager_secret" "database_url" {
   }
 }
 
+# Cloud Run Backend Service
+resource "google_cloud_run_v2_service" "backend" {
+  name     = "credit-score-backend"
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    scaling {
+      max_instance_count = 1
+    }
+    containers {
+      image = "us-central1-docker.pkg.dev/${var.project_id}/credit-score-repo/credit-score-backend:latest" # Placeholder
+      env {
+        name  = "DATABASE_URL"
+        value = "placeholder" # Managed by Secret or CD
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      client,
+      client_version,
+      template[0].containers[0].image,
+      template[0].containers[0].env, # Environment variables are set in CD
+    ]
+  }
+}
+
+# Cloud Run Frontend Service
+resource "google_cloud_run_v2_service" "frontend" {
+  name     = "credit-score-frontend"
+  location = var.region
+  ingress  = "INGRESS_TRAFFIC_ALL"
+
+  template {
+    scaling {
+      max_instance_count = 1
+    }
+    containers {
+      image = "us-central1-docker.pkg.dev/${var.project_id}/credit-score-repo/credit-score-frontend:latest" # Placeholder
+      env {
+        name  = "BACKEND_URL"
+        value = google_cloud_run_v2_service.backend.uri
+      }
+    }
+  }
+
+  lifecycle {
+    ignore_changes = [
+      client,
+      client_version,
+      template[0].containers[0].image,
+      template[0].containers[0].env, # Environment variables are set in CD
+    ]
+  }
+}
+
+# Public Access IAM
+resource "google_cloud_run_v2_service_iam_member" "backend_public" {
+  location = google_cloud_run_v2_service.backend.location
+  name     = google_cloud_run_v2_service.backend.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+resource "google_cloud_run_v2_service_iam_member" "frontend_public" {
+  location = google_cloud_run_v2_service.frontend.location
+  name     = google_cloud_run_v2_service.frontend.name
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
 output "registry_url" {
   value = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.repo.repository_id}"
 }
