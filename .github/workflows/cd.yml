@@ -20,7 +20,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     if: |
-      github.event_name == 'workflow_dispatch' || 
+      github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     steps:
       - uses: actions/checkout@v4
@@ -63,13 +63,16 @@ jobs:
 
       - name: Deploy Backend to Cloud Run
         id: deploy-backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |
-          BACKEND_URL=$(gcloud run deploy ${BACKEND_SERVICE} \
-            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${BACKEND_SERVICE}:${GITHUB_SHA} \
-            --region ${REGION} \
+          BACKEND_URL=$(gcloud run deploy "${BACKEND_SERVICE}" \
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${BACKEND_SERVICE}:${GITHUB_SHA}" \
+            --region "${REGION}" \
             --platform managed \
+            --quiet \
             --allow-unauthenticated \
-            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            --set-env-vars "DATABASE_URL=${DATABASE_URL}" \
             --format 'value(status.url)')
           echo "BACKEND_URL=${BACKEND_URL}" >> $GITHUB_ENV
 
@@ -79,10 +82,11 @@ jobs:
             echo "Error: BACKEND_URL is empty. Cannot deploy frontend."
             exit 1
           fi
-          
-          gcloud run deploy ${FRONTEND_SERVICE} \
-            --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${FRONTEND_SERVICE}:${GITHUB_SHA} \
-            --region ${REGION} \
+
+          gcloud run deploy "${FRONTEND_SERVICE}" \
+            --image "${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${FRONTEND_SERVICE}:${GITHUB_SHA}" \
+            --region "${REGION}" \
             --platform managed \
+            --quiet \
             --allow-unauthenticated \
-            --set-env-vars BACKEND_URL=${BACKEND_URL}
+            --set-env-vars "BACKEND_URL=${BACKEND_URL}"
