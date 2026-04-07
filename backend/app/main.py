@@ -21,7 +21,7 @@ async def root():
 
 @app.get("/health")
 async def health_check(session: Session = Depends(get_session)) -> dict[str, str]:
-    session.execute(text("SELECT 1"))
+    session.connection().execute(text("SELECT 1"))
     return {"status": "healthy", "database": "connected"}
 
 @app.post("/companies", response_model=Company)
@@ -31,7 +31,7 @@ async def create_company(
     session: Session = Depends(get_session)
 ):
     user_id = request.headers.get("X-User-ID", "anonymous_analyst")
-    session.execute(text("SELECT set_config('app.current_user', :u, true)"), {"u": user_id})
+    session.connection().execute(text("SELECT set_config('app.current_user', :u, true)"), {"u": user_id})
     
     insert_stmt = pg_insert(Company).values(**company_in.model_dump())
     upsert_stmt = insert_stmt.on_conflict_do_update(
@@ -43,7 +43,7 @@ async def create_company(
         }
     )
     
-    session.execute(upsert_stmt)
+    session.connection().execute(upsert_stmt)
     res = session.exec(select(Company).where(Company.nip == company_in.nip)).first()
     if not res:
         raise HTTPException(status_code=500, detail="Failed to create or update company.")
@@ -58,7 +58,7 @@ async def submit_statement(
     session: Session = Depends(get_session)
 ):
     user_id = request.headers.get("X-User-ID", "anonymous_analyst")
-    session.execute(text("SELECT set_config('app.current_user', :u, true)"), {"u": user_id})
+    session.connection().execute(text("SELECT set_config('app.current_user', :u, true)"), {"u": user_id})
 
     # Find company ID
     company = session.exec(select(Company).where(Company.nip == stmt_in.company_nip)).first()
@@ -85,7 +85,7 @@ async def submit_statement(
                 "sales_revenue": insert_stmt.excluded.sales_revenue,
             }
         )
-        session.execute(upsert_stmt)
+        session.connection().execute(upsert_stmt)
         
         # Fetch back to get ID (satisfies mypy)
         db_stmt = session.exec(
@@ -100,7 +100,7 @@ async def submit_statement(
         stmt_id = db_stmt.id
         
         # Call rating function
-        decision_id = session.execute(
+        decision_id = session.connection().execute(
             text("SELECT fn_generate_rating(:stmt_id, :amount) as decision_id"),
             {"stmt_id": stmt_id, "amount": stmt_in.requested_amount}
         ).scalar()
@@ -175,5 +175,5 @@ async def get_company_history(nip: str, session: Session = Depends(get_session))
 
 @app.get("/portfolio/summary", response_model=List[PortfolioSummary])
 async def get_portfolio_summary(session: Session = Depends(get_session)):
-    results = session.execute(text("SELECT * FROM vw_portfolio_risk_summary")).mappings().all()
+    results = session.connection().execute(text("SELECT * FROM vw_portfolio_risk_summary")).mappings().all()
     return [PortfolioSummary.model_validate(r) for r in results]
