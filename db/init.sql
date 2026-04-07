@@ -242,8 +242,8 @@ END;
 $$ LANGUAGE plpgsql;
 
 -- 9. Apply Triggers
-CREATE TRIGGER trg_audit_credit_decisions AFTER INSERT OR UPDATE OR DELETE ON credit_decisions FOR EACH ROW EXECUTE FUNCTION fn_audit_generic();
-CREATE TRIGGER trg_audit_companies AFTER INSERT OR UPDATE OR DELETE ON companies FOR EACH ROW EXECUTE FUNCTION fn_audit_generic();
+CREATE OR REPLACE TRIGGER trg_audit_credit_decisions AFTER INSERT OR UPDATE OR DELETE ON credit_decisions FOR EACH ROW EXECUTE FUNCTION fn_audit_generic();
+CREATE OR REPLACE TRIGGER trg_audit_companies AFTER INSERT OR UPDATE OR DELETE ON companies FOR EACH ROW EXECUTE FUNCTION fn_audit_generic();
 
 -- 10. Seed Data
 DO $$
