@@ -1,31 +1,46 @@
-# Use the latest official Python runtime as a parent image
+# Stage 1: Build stage
+FROM python:3.14-slim-bookworm AS builder
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV UV_COMPILE_BYTECODE=1
+
+WORKDIR /app
+
+# Install uv and build dependencies
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install dependencies into a virtual environment
+COPY pyproject.toml uv.lock ./
+RUN uv venv /opt/venv && \
+    VIRTUAL_ENV=/opt/venv uv pip install --no-cache .
+
+# Stage 2: Runtime stage
 FROM python:3.14-slim-bookworm
 
-# Set environment variables using modern key=value syntax
+WORKDIR /app
+
+# Copy the virtual environment from the builder stage
+COPY --from=builder /opt/venv /opt/venv
+
+# Install runtime dependencies and clean up
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set environment variables
+ENV PATH="/opt/venv/bin:$PATH"
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# Set the working directory in the container
-WORKDIR /app
-
-# Install uv for ultra-fast dependency management
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
-# Install system dependencies and upgrade packages to fix vulnerabilities
-RUN apt-get update && apt-get upgrade -y && apt-get install -y \
-    libpq-dev \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies using uv
-COPY pyproject.toml .
-RUN uv pip install --no-cache --system .
-
-# Copy the rest of the application code
+# Copy application code
 COPY . .
 
-# Expose the port Streamlit runs on
 EXPOSE 8501
 
-# Command to run the application
 CMD ["streamlit", "run", "app/main.py", "--server.port=8501", "--server.address=0.0.0.0"]
