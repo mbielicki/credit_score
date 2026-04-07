@@ -22,3 +22,4 @@
 - [x] Add automated database initialization for tests.
 - [x] Streamline documentation for agentic efficiency.
 - [x] Establish persistent task tracking (`TODO.md`).
+- [x] Anonymize company data (remove real NIPs/KRS/Names).

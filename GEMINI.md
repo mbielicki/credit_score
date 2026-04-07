@@ -37,3 +37,4 @@ Every code change **MUST** pass these checks before completion:
 - **Surgical Edits**: Use `replace` for targeted updates; avoid full file rewrites.
 - **Context Awareness**: Always check `db/init.sql` for the source of truth on stored procedures and `backend/app/models.py` for the API contract.
 - **NIP Validation**: Polish Tax ID (NIP) checksum validation is mandatory in all company-related models.
+- **Anonymization**: NEVER use real company names, NIPs, or KRS numbers in the codebase (tests, seed data, or documentation). Always use fictional, generated data for testing and examples.

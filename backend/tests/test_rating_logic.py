@@ -3,9 +3,9 @@ from app.models import FinancialStatementCreate, CompanyBase
 from pydantic import ValidationError
 
 def test_financial_statement_model():
-    # 7740001454 is a valid NIP (PKN Orlen)
+    # 1234563218 is a valid NIP for testing
     stmt = FinancialStatementCreate(
-        company_nip="7740001454",
+        company_nip="1234563218",
         fiscal_year=2024,
         total_assets=1000.0,
         total_liabilities=500.0,
@@ -19,13 +19,13 @@ def test_financial_statement_model():
         sales_revenue=2000.0,
         requested_amount=100.0
     )
-    assert stmt.company_nip == "7740001454"
+    assert stmt.company_nip == "1234563218"
     assert stmt.total_assets == 1000.0
     assert stmt.depreciation == 20.0
 
 def test_optional_depreciation():
     stmt = FinancialStatementCreate(
-        company_nip="7740001454",
+        company_nip="1234563218",
         fiscal_year=2024,
         total_assets=1000.0,
         total_liabilities=500.0,
@@ -42,7 +42,7 @@ def test_optional_depreciation():
 
 def test_nip_validation():
     # Valid NIP
-    CompanyBase(nip="7740001454", krs="1234567890", name="Test")
+    CompanyBase(nip="1234563218", krs="1234567890", name="Test")
     
     # Invalid NIP (wrong checksum)
     with pytest.raises(ValidationError) as exc:

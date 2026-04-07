@@ -8,11 +8,11 @@ def test_root_endpoint(client: TestClient):
     assert response.json()["message"] == "IRB Credit Rating Engine API is active"
 
 def test_create_company_integration(client: TestClient, session: Session):
-    nip = "7740001454"
+    nip = "1234563218"
     data = {
         "nip": nip,
-        "krs": "0000030492",
-        "name": "PKN ORLEN SA",
+        "krs": "0000123456",
+        "name": "Lumina-Vortex Solutions Sp. z o.o.",
         "industry": "Oil & Gas"
     }
     
@@ -21,33 +21,33 @@ def test_create_company_integration(client: TestClient, session: Session):
     assert response.status_code == 200
     res_json = response.json()
     assert res_json["nip"] == nip
-    assert res_json["name"] == "PKN ORLEN SA"
+    assert res_json["name"] == "Lumina-Vortex Solutions Sp. z o.o."
     
     # Verify in DB
     company = session.exec(select(Company).where(Company.nip == nip)).first()
     assert company is not None
     if company:
-        assert company.name == "PKN ORLEN SA"
+        assert company.name == "Lumina-Vortex Solutions Sp. z o.o."
     
     # 2. Test upsert (ON CONFLICT)
-    data["name"] = "ORLEN SA"
+    data["name"] = "Lumina-Vortex SA"
     response = client.post("/companies", json=data)
     assert response.status_code == 200
-    assert response.json()["name"] == "ORLEN SA"
+    assert response.json()["name"] == "Lumina-Vortex SA"
     
     session.expire_all() # Refresh session
     company_updated = session.exec(select(Company).where(Company.nip == nip)).first()
     assert company_updated is not None
     if company_updated:
-        assert company_updated.name == "ORLEN SA"
+        assert company_updated.name == "Lumina-Vortex SA"
 
 def test_submit_statement_and_get_rating_integration(client: TestClient, session: Session):
-    nip = "7740001454"
+    nip = "1234563218"
     # Ensure company exists
     client.post("/companies", json={
         "nip": nip,
-        "krs": "0000030492",
-        "name": "ORLEN SA",
+        "krs": "0000123456",
+        "name": "Lumina-Vortex SA",
         "industry": "Oil & Gas"
     })
     
