@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-type-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Lint Backend (Ruff)
+        run: uv run --project backend ruff check backend
+      - name: Type Check Backend (Mypy)
+        run: uv run --project backend mypy backend --config-file backend/mypy.ini
+
+      - name: Lint Frontend (Ruff)
+        run: uv run --project frontend ruff check frontend
+      - name: Type Check Frontend (Mypy)
+        run: uv run --project frontend mypy frontend/app --config-file frontend/mypy.ini
+
+  backend-tests:
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_DB: credit_score_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        # Wait for postgres to be ready
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Run Backend Tests
+        env:
+          DATABASE_URL: postgresql://postgres:password@localhost:5432/credit_score_db
+        run: uv run --project backend pytest backend/tests
+
+  frontend-e2e-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Set up Python
+        run: uv python install 3.14
+
+      - name: Install Playwright Browsers
+        run: uv run --project frontend playwright install --with-deps chromium
+
+      - name: Build and Start Services
+        run: docker compose up -d --build
+
+      - name: Wait for Frontend to be Ready
+        run: |
+          # Simple check to see if Streamlit is up
+          for i in {1..20}; do
+            if curl -s http://localhost:8501 > /dev/null; then
+              echo "Frontend is up!"
+              break
+            fi
+            echo "Waiting for frontend..."
+            sleep 5
+          done
+
+      - name: Run Frontend E2E Tests
+        run: uv run --project frontend pytest frontend/tests/e2e
+
+      - name: Clean Up
+        if: always()
+        run: docker compose down

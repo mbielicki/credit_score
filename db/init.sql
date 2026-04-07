@@ -259,7 +259,14 @@ BEGIN
         "net_profit_plus_depreciation_to_total_liabilities": 2.903,
         "current_assets_to_current_liabilities": 0.452
     }'::jsonb)
+    ON CONFLICT (model_name, version) DO UPDATE SET is_active = TRUE
     RETURNING id INTO v_mid;
+
+    -- If v_mid is NULL (because of a conflict where we didn't update or RETURNING didn't fire as expected)
+    -- let's fetch it.
+    IF v_mid IS NULL THEN
+        SELECT id INTO v_mid FROM rating_model_params WHERE model_name = 'Maczynska_Zawadzki_Model_G' AND version = '2006_G';
+    END IF;
 
     -- Seed Rating Bands
     INSERT INTO rating_bands (rating_model_id, min_z_score, rating_class, pd_percentage, risk_profile) VALUES
@@ -270,7 +277,8 @@ BEGIN
     (v_mid, 0.5,  'BB',  0.0100, 'Speculative'),
     (v_mid, 0.0,  'B',   0.0500, 'Highly Speculative'),
     (v_mid, -1.0, 'CCC', 0.2000, 'Substantial Risk'),
-    (v_mid, -999, 'D',   0.5000, 'Default');
+    (v_mid, -999, 'D',   0.5000, 'Default')
+    ON CONFLICT (rating_model_id, min_z_score) DO NOTHING;
 
     -- Seed Adjudication Rules
     INSERT INTO adjudication_rules (rating_model_id, rating_class, max_amount, decision_status) VALUES
@@ -279,7 +287,8 @@ BEGIN
     (v_mid, 'A',   1000000, 'APPROVED'),
     (v_mid, 'BBB', 1000000, 'APPROVED'),
     (v_mid, 'CCC', NULL,    'REJECTED'),
-    (v_mid, 'D',   NULL,    'REJECTED');
+    (v_mid, 'D',   NULL,    'REJECTED')
+    ON CONFLICT (rating_model_id, rating_class, max_amount) DO NOTHING;
 END $$;
 
 -- 11. Views
