@@ -4,7 +4,7 @@
 - [ ] **Infra & CI/CD ($0 Budget Stack)**:
 - [x] **Infrastructure**: Setup Terraform for GCP (Cloud Run, Artifact Registry).
 - [x] **Database**: Configure Neon/Supabase integration and migration runner (Decoupled CD step).
-- [x] **CI/CD**: implement GitHub Actions for automated testing and deployment to Cloud Run. (CI is fully automated; CD requires GitHub Secrets to be set up).
+- [x] **CI/CD**: implement GitHub Actions for automated testing and deployment to Cloud Run. (CI is fully automated; CD requires GitHub Secrets and correctly installed `uv` on runner).
 
 ## 🟡 Backlog
 - [ ] **Rating Edge Cases**: Add backend tests for division by zero or NULL values in financial statements.
