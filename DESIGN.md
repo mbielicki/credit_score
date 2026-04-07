@@ -52,6 +52,7 @@
   - `current_liabilities` (DECIMAL)
   - `operating_profit` (DECIMAL)
   - `net_profit` (DECIMAL)
+  - `depreciation` (DECIMAL)
   - `gross_profit` (DECIMAL)
   - `sales_revenue` (DECIMAL)
   - `created_at` (TIMESTAMPTZ)
@@ -78,16 +79,17 @@
   - `changed_by` (VARCHAR(100))
   - `changed_at` (TIMESTAMPTZ)
 
-## 3. Mathematical Engine: Mączyńska (2006)
+## 3. Mathematical Engine: Mączyńska Model G (2006)
 
-### 3.1. Ratios ($X_1$ to $X_5$)
-1.  **$X_1$ (Basic Earnings Power)** = Operating Profit / Total Assets
-2.  **$X_2$ (Equity Coverage)** = Equity / Total Assets
-3.  **$X_3$ (ROA)** = Net Profit / Total Assets
-4.  **$X_4$ (Gross Margin)** = Gross Profit / Sales Revenue
-5.  **$X_5$ (Current Liquidity)** = Current Assets / Current Liabilities (Capped at 99.99 for 0-liability cases).
+### 3.1. Ratios (Model G)
+1.  **$x_2$ (Operating Profitability of Assets)** = Operating Profit / Total Assets
+2.  **$x_5$ (Equity Ratio)** = Equity / Total Assets
+3.  **$x_7$ (Debt Service Coverage)** = (Net Profit + Depreciation) / Total Liabilities
+4.  **$x_9$ (Current Liquidity)** = Current Assets / Current Liabilities
 
-### 3.2. Formula (Dynamic)
+### 3.2. Formula (Model G)
+$Z = 9.498 \cdot x_2 + 3.566 \cdot x_5 + 2.903 \cdot x_7 + 0.452 \cdot x_9 - 1.498$
+
 The engine dynamically iterates through `rating_model_params.coefficients`. 
 It calculates $Z$ as a weighted sum of available ratios plus an `intercept`.
 Checks for missing coefficients or NULL values to prevent calculation errors.

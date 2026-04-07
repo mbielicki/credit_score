@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS rating_model_params (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     model_name VARCHAR(100) NOT NULL,
     version VARCHAR(20) NOT NULL,
-    coefficients JSONB NOT NULL, -- {w1: 9.478, ..., intercept: -2.478}
+    coefficients JSONB NOT NULL, -- {intercept: -1.498, ratio_name: weight, ...}
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(model_name, version)
@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS financial_statements (
     current_liabilities DECIMAL(19,4) NOT NULL CHECK (current_liabilities >= 0),
     operating_profit DECIMAL(19,4) NOT NULL,
     net_profit DECIMAL(19,4) NOT NULL,
+    depreciation DECIMAL(19,4) NOT NULL DEFAULT 0,
     gross_profit DECIMAL(19,4) NOT NULL,
     sales_revenue DECIMAL(19,4) NOT NULL CHECK (sales_revenue >= 0),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
@@ -97,21 +98,49 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     changed_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- 5. Business Logic Function
+-- 5. Scalability Indexes
+CREATE INDEX IF NOT EXISTS idx_financial_statements_company_id ON financial_statements(company_id);
+CREATE INDEX IF NOT EXISTS idx_credit_decisions_statement_id ON credit_decisions(statement_id);
+CREATE INDEX IF NOT EXISTS idx_credit_decisions_rating_model_id ON credit_decisions(rating_model_id);
+CREATE INDEX IF NOT EXISTS idx_rating_bands_rating_model_id ON rating_bands(rating_model_id);
+CREATE INDEX IF NOT EXISTS idx_adjudication_rules_rating_model_id ON adjudication_rules(rating_model_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_record_id ON audit_logs(record_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_table_name ON audit_logs(table_name);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_new_values ON audit_logs USING GIN (new_values);
+
+-- 6. Calculation Layer (Descriptive Ratios)
+CREATE OR REPLACE VIEW vw_financial_ratios AS
+SELECT 
+    id AS statement_id,
+    company_id,
+    -- Mączyńska Model G Ratios (Descriptive)
+    COALESCE(operating_profit / NULLIF(total_assets, 0), 0) AS operating_profit_to_total_assets,
+    COALESCE(equity / NULLIF(total_assets, 0), 0) AS equity_to_total_assets,
+    COALESCE((net_profit + depreciation) / NULLIF(total_liabilities, 0), 0) AS net_profit_plus_depreciation_to_total_liabilities,
+    COALESCE(current_assets / NULLIF(current_liabilities, 0), 0) AS current_assets_to_current_liabilities,
+    -- Future Altman Ratios (Example)
+    COALESCE((current_assets - current_liabilities) / NULLIF(total_assets, 0), 0) AS working_capital_to_total_assets,
+    COALESCE(sales_revenue / NULLIF(total_assets, 0), 0) AS asset_turnover
+FROM financial_statements;
+
+-- 7. Dynamic Model-Agnostic Rating Function
 CREATE OR REPLACE FUNCTION fn_generate_rating(p_stmt_id UUID, p_requested_amount DECIMAL DEFAULT 0)
 RETURNS UUID AS $$
 DECLARE
-    v_total_assets DECIMAL; v_equity DECIMAL; v_current_assets DECIMAL; 
-    v_current_liabilities DECIMAL; v_operating_profit DECIMAL; 
-    v_net_profit DECIMAL; v_gross_profit DECIMAL; v_sales_revenue DECIMAL;
-    
-    v_rating_model_id UUID; v_coeffs JSONB; v_ratios JSONB;
-    v_x1 DECIMAL; v_x2 DECIMAL; v_x3 DECIMAL; v_x4 DECIMAL; v_x5 DECIMAL;
-    v_z DECIMAL; v_rating VARCHAR(3); v_pd DECIMAL; v_status decision_status_enum; v_reason TEXT;
+    v_rating_model_id UUID; 
+    v_coeffs JSONB; 
+    v_ratios JSONB;
+    v_z DECIMAL; 
+    v_rating VARCHAR(3); 
+    v_pd DECIMAL; 
+    v_status decision_status_enum; 
+    v_reason TEXT;
     v_decision_id UUID;
-    v_key TEXT; v_val TEXT; v_ratio_val DECIMAL;
+    v_key TEXT; 
+    v_weight TEXT; 
+    v_ratio_val DECIMAL;
 BEGIN
-    -- 1. Fetch active model parameters (latest version)
+    -- 1. Fetch active model parameters
     SELECT id, coefficients INTO v_rating_model_id, v_coeffs 
     FROM rating_model_params 
     WHERE is_active = TRUE 
@@ -121,56 +150,36 @@ BEGIN
         RAISE EXCEPTION 'No active rating model found.';
     END IF;
 
-    -- 2. Fetch financial data
-    SELECT total_assets, equity, current_assets, current_liabilities,
-           operating_profit, net_profit, gross_profit, sales_revenue
-    INTO v_total_assets, v_equity, v_current_assets, v_current_liabilities,
-         v_operating_profit, v_net_profit, v_gross_profit, v_sales_revenue
-    FROM financial_statements WHERE id = p_stmt_id;
+    -- 2. Fetch all calculated ratios for this statement from the View
+    SELECT to_jsonb(r) INTO v_ratios
+    FROM vw_financial_ratios r
+    WHERE r.statement_id = p_stmt_id;
 
-    IF v_total_assets IS NULL THEN
+    IF v_ratios IS NULL THEN
         RAISE EXCEPTION 'Financial statement with ID % not found.', p_stmt_id;
     END IF;
 
-    -- 3. Calculate Ratios with edge case handling
-    v_x1 := COALESCE(v_operating_profit / NULLIF(v_total_assets, 0), 0);
-    v_x2 := COALESCE(v_equity / NULLIF(v_total_assets, 0), 0);
-    v_x3 := COALESCE(v_net_profit / NULLIF(v_total_assets, 0), 0);
-    v_x4 := COALESCE(v_gross_profit / NULLIF(v_sales_revenue, 0), 0);
-    
-    IF v_current_liabilities = 0 THEN
-        IF v_current_assets > 0 THEN v_x5 := 99.99; ELSE v_x5 := 0; END IF;
-    ELSE
-        v_x5 := v_current_assets / v_current_liabilities;
-    END IF;
-
-    -- Store ratios in JSONB for dynamic calculation
-    v_ratios := jsonb_build_object('w1', v_x1, 'w2', v_x2, 'w3', v_x3, 'w4', v_x4, 'w5', v_x5);
-
-    -- 4. Robust Dynamic Z-score calculation
+    -- 3. Dynamic Z-score calculation
     IF NOT (v_coeffs ? 'intercept') THEN
         RAISE EXCEPTION 'Model configuration error: Missing intercept coefficient.';
     END IF;
     
     v_z := (v_coeffs->>'intercept')::DECIMAL;
 
-    FOR v_key, v_val IN SELECT * FROM jsonb_each_text(v_coeffs) LOOP
+    FOR v_key, v_weight IN SELECT * FROM jsonb_each_text(v_coeffs) LOOP
         IF v_key = 'intercept' THEN CONTINUE; END IF;
         
+        -- Look up the ratio value by its descriptive key name
         v_ratio_val := (v_ratios->>v_key)::DECIMAL;
+        
         IF v_ratio_val IS NULL THEN
-            RAISE EXCEPTION 'Model requires coefficient % but corresponding ratio is not defined or calculated.', v_key;
+            RAISE EXCEPTION 'Model requires ratio "%" but it is not defined in vw_financial_ratios.', v_key;
         END IF;
 
-        IF v_val IS NULL THEN
-            RAISE EXCEPTION 'NULL coefficient detected for weight %.', v_key;
-        END IF;
-
-        v_z := v_z + (v_val::DECIMAL * v_ratio_val);
+        v_z := v_z + (v_weight::DECIMAL * v_ratio_val);
     END LOOP;
 
-    -- 5. Rating Mapping (De-hardcoded from rating_bands)
-    -- Using >= for inclusive lower bounds
+    -- 4. Rating Mapping
     SELECT rating_class, pd_percentage INTO v_rating, v_pd
     FROM rating_bands
     WHERE rating_model_id = v_rating_model_id AND v_z >= min_z_score
@@ -183,7 +192,7 @@ BEGIN
         ORDER BY min_z_score ASC LIMIT 1;
     END IF;
 
-    -- 6. Adjudication (De-hardcoded from adjudication_rules)
+    -- 5. Adjudication
     SELECT decision_status INTO v_status
     FROM adjudication_rules
     WHERE rating_model_id = v_rating_model_id 
@@ -199,7 +208,7 @@ BEGIN
         v_reason := 'Automated decision based on rating ' || v_rating || '.';
     END IF;
 
-    -- 7. Insert & Return
+    -- 6. Insert & Return
     INSERT INTO credit_decisions (statement_id, rating_model_id, requested_amount, z_score, pd_percentage, rating_class, decision_status, decision_reason)
     VALUES (p_stmt_id, v_rating_model_id, p_requested_amount, v_z, v_pd, v_rating, v_status, v_reason)
     RETURNING id INTO v_decision_id;
@@ -208,12 +217,11 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 6. Audit Trigger Function
+-- 8. Audit Trigger Function
 CREATE OR REPLACE FUNCTION fn_audit_generic() RETURNS TRIGGER AS $$
 DECLARE
     v_user VARCHAR(100);
 BEGIN
-    -- Attempt to get application-level user, fallback to DB user
     v_user := COALESCE(current_setting('app.current_user', true), CURRENT_USER);
 
     IF (TG_OP = 'INSERT') THEN
@@ -233,18 +241,24 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- 7. Apply Triggers
+-- 9. Apply Triggers
 CREATE TRIGGER trg_audit_credit_decisions AFTER INSERT OR UPDATE OR DELETE ON credit_decisions FOR EACH ROW EXECUTE FUNCTION fn_audit_generic();
 CREATE TRIGGER trg_audit_companies AFTER INSERT OR UPDATE OR DELETE ON companies FOR EACH ROW EXECUTE FUNCTION fn_audit_generic();
 
--- 8. Seed Data
+-- 10. Seed Data
 DO $$
 DECLARE
     v_mid UUID;
 BEGIN
-    -- Seed Model
+    -- Seed Model G (Mączyńska & Zawadzki 2006)
     INSERT INTO rating_model_params (model_name, version, coefficients)
-    VALUES ('Maczynska_Zawadzki', '2006_Model_1', '{"w1": 9.478, "w2": 3.613, "w3": 3.256, "w4": 0.454, "w5": 0.802, "intercept": -2.478}'::jsonb)
+    VALUES ('Maczynska_Zawadzki_Model_G', '2006_G', '{
+        "intercept": -1.498,
+        "operating_profit_to_total_assets": 9.498,
+        "equity_to_total_assets": 3.566,
+        "net_profit_plus_depreciation_to_total_liabilities": 2.903,
+        "current_assets_to_current_liabilities": 0.452
+    }'::jsonb)
     RETURNING id INTO v_mid;
 
     -- Seed Rating Bands
@@ -268,7 +282,7 @@ BEGIN
     (v_mid, 'D',   NULL,    'REJECTED');
 END $$;
 
--- 9. Views
+-- 11. Views
 CREATE OR REPLACE VIEW vw_portfolio_risk_summary AS
 SELECT rating_class, COUNT(*) as count, ROUND(COUNT(*) * 100.0 / NULLIF(SUM(COUNT(*)) OVER(), 0), 2) as percentage
 FROM credit_decisions GROUP BY rating_class;

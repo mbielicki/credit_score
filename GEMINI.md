@@ -1,7 +1,7 @@
 # IRB Credit Rating & Loan Decision Engine
 
 ## Project Overview
-A demo corporate credit rating system for the Polish market using the Hołda/Mączyńska model to predict bankruptcy probability (PD) for SMEs.
+A demo corporate credit rating system for the Polish market using the **Mączyńska Model G (2006)** to predict bankruptcy probability (PD) for SMEs. This model utilizes 4 financial indicators: operating profitability, equity ratio, debt service coverage (cash flow based), and current liquidity.
 
 ## Architecture
 - **Monorepo Structure**:
