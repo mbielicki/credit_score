@@ -11,7 +11,7 @@ st.set_page_config(
 )
 
 # Configuration
-BACKEND_URL = os.getenv("BACKEND_URL", "http://localhost:8000")
+BACKEND_URL = (os.getenv("BACKEND_URL") or "http://localhost:8000").strip().rstrip("/")
 ST_SIDEBAR_STATE = "expanded"
 
 # --- Helper Functions ---

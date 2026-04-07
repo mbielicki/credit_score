@@ -62,18 +62,23 @@ jobs:
           uv run --project backend python scripts/migrate.py
 
       - name: Deploy Backend to Cloud Run
+        id: deploy-backend
         run: |
-          gcloud run deploy ${BACKEND_SERVICE} \
+          BACKEND_URL=$(gcloud run deploy ${BACKEND_SERVICE} \
             --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${BACKEND_SERVICE}:${GITHUB_SHA} \
             --region ${REGION} \
             --platform managed \
             --allow-unauthenticated \
-            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }}
+            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }} \
+            --format 'value(status.url)')
+          echo "BACKEND_URL=${BACKEND_URL}" >> $GITHUB_ENV
 
       - name: Deploy Frontend to Cloud Run
         run: |
-          # Get backend URL
-          BACKEND_URL=$(gcloud run services describe ${BACKEND_SERVICE} --region ${REGION} --format 'value(status.url)')
+          if [ -z "${BACKEND_URL}" ]; then
+            echo "Error: BACKEND_URL is empty. Cannot deploy frontend."
+            exit 1
+          fi
           
           gcloud run deploy ${FRONTEND_SERVICE} \
             --image ${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${FRONTEND_SERVICE}:${GITHUB_SHA} \
