@@ -27,9 +27,9 @@ For every feature or bug, follow the full lifecycle:
 
 ### 3. Verification Protocol (Mandatory)
 - Every code change **MUST** be verified by running:
-  - `pytest` for logic and backend logic.
-  - `ruff` or `flake8` for linting.
-  - `mypy` for type checking.
+  - `pytest`: `uv run --project backend pytest backend/tests`
+  - `ruff`: `uv run --project backend ruff check backend`
+  - `mypy`: `uv run --project backend mypy backend`
 - No change is complete without an accompanying test or a successful test run.
 
 ### 4. Database Integrity

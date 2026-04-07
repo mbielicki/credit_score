@@ -12,8 +12,17 @@ dependencies = [
     "pydantic-settings==2.13.1",
     "pytest==9.0.2",
     "python-multipart==0.0.24",
+    "sqlmodel==0.0.23",
 ]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = "test_*.py"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=1.20.0",
+    "ruff>=0.15.9",
+    "types-psycopg2>=2.9.21.20260223",
+]
