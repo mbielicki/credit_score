@@ -21,22 +21,22 @@ def db_init_fixture():
     with Session(engine) as session:
         # We need to execute the script. 
         # SQLModel doesn't have a direct "execute script" but we can use raw connection
-        session.exec(text("DROP VIEW IF EXISTS vw_portfolio_risk_summary CASCADE"))
-        session.exec(text("DROP VIEW IF EXISTS vw_financial_ratios CASCADE"))
-        session.exec(text("DROP TABLE IF EXISTS audit_logs CASCADE"))
-        session.exec(text("DROP TABLE IF EXISTS credit_decisions CASCADE"))
-        session.exec(text("DROP TABLE IF EXISTS financial_statements CASCADE"))
-        session.exec(text("DROP TABLE IF EXISTS companies CASCADE"))
-        session.exec(text("DROP TABLE IF EXISTS adjudication_rules CASCADE"))
-        session.exec(text("DROP TABLE IF EXISTS rating_bands CASCADE"))
-        session.exec(text("DROP TABLE IF EXISTS rating_model_params CASCADE"))
+        session.connection().execute(text("DROP VIEW IF EXISTS vw_portfolio_risk_summary CASCADE"))
+        session.connection().execute(text("DROP VIEW IF EXISTS vw_financial_ratios CASCADE"))
+        session.connection().execute(text("DROP TABLE IF EXISTS audit_logs CASCADE"))
+        session.connection().execute(text("DROP TABLE IF EXISTS credit_decisions CASCADE"))
+        session.connection().execute(text("DROP TABLE IF EXISTS financial_statements CASCADE"))
+        session.connection().execute(text("DROP TABLE IF EXISTS companies CASCADE"))
+        session.connection().execute(text("DROP TABLE IF EXISTS adjudication_rules CASCADE"))
+        session.connection().execute(text("DROP TABLE IF EXISTS rating_bands CASCADE"))
+        session.connection().execute(text("DROP TABLE IF EXISTS rating_model_params CASCADE"))
         session.commit()
         
         # Now run the init script
         # Note: psycopg2 (or whatever driver) might have trouble with some SQL blocks,
         # but for this demo, we'll try to run it.
         # Splitting by common separators might be safer but let's try direct execute.
-        session.exec(text(sql))
+        session.connection().execute(text(sql))
         session.commit()
 
 @pytest.fixture(name="session")

@@ -83,7 +83,7 @@ def test_submit_statement_and_get_rating_integration(client: TestClient, session
     assert res_json["model_name"] == "Maczynska_Zawadzki_Model_G"
     
     # Check audit logs (triggered by DB)
-    audit_res = session.execute(text("SELECT * FROM audit_logs WHERE table_name = 'credit_decisions'")).mappings().first()
+    audit_res = session.connection().execute(text("SELECT * FROM audit_logs WHERE table_name = 'credit_decisions'")).mappings().first()
     assert audit_res is not None
     assert audit_res["action"] == "INSERT"
 
