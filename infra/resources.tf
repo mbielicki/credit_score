@@ -6,12 +6,12 @@ resource "google_artifact_registry_repository" "repo" {
   format        = "DOCKER"
   depends_on    = [google_project_service.services]
 
-  # Keep only the last 3 versions of each image to stay under 0.5GB
+  # Keep only the last 2 versions of each image to stay under 0.5GB
   cleanup_policies {
     id     = "keep-recent-versions"
     action = "KEEP"
     most_recent_versions {
-      keep_count = 3
+      keep_count = 2
     }
   }
 

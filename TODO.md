@@ -17,3 +17,4 @@
 - [x] Add automated E2E tests for Frontend (Playwright).
 - [x] Refactor backend to SQLModel/SQLAlchemy 2.0.
 - [x] Establish persistent task tracking (`TODO.md`).
+- [x] Refine Artifact Registry retention policy (reduced to 2 images to fit within 500MB free tier).
