@@ -29,6 +29,10 @@ Every code change **MUST** pass these checks before completion:
 - Maintain transactional integrity (ACID) for all rating generation events.
 - Audit logs MUST capture analyst ID via `set_config('app.current_user', user_id, true)`.
 
+### 4. Task Tracking & State
+- **Source of Truth**: The `TODO.md` file tracks the current state of development.
+- **Mandate**: Agents MUST read `TODO.md` at the start of a session and update it (mark completed, add new tasks) before ending.
+
 ## Agent Guidelines
 - **Surgical Edits**: Use `replace` for targeted updates; avoid full file rewrites.
 - **Context Awareness**: Always check `db/init.sql` for the source of truth on stored procedures and `backend/app/models.py` for the API contract.
