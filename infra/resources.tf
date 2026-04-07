@@ -62,7 +62,7 @@ resource "google_cloud_run_v2_service" "backend" {
       max_instance_count = 1
     }
     containers {
-      image = "us-central1-docker.pkg.dev/${var.project_id}/credit-score-repo/credit-score-backend:latest" # Placeholder
+      image = "gcr.io/cloudrun/hello" # Placeholder to allow initial apply/import without local images
       env {
         name  = "DATABASE_URL"
         value = "placeholder" # Managed by Secret or CD
@@ -91,7 +91,7 @@ resource "google_cloud_run_v2_service" "frontend" {
       max_instance_count = 1
     }
     containers {
-      image = "us-central1-docker.pkg.dev/${var.project_id}/credit-score-repo/credit-score-frontend:latest" # Placeholder
+      image = "gcr.io/cloudrun/hello" # Placeholder to allow initial apply/import without local images
       env {
         name  = "BACKEND_URL"
         value = google_cloud_run_v2_service.backend.uri
