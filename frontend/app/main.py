@@ -18,7 +18,7 @@ ST_SIDEBAR_STATE = "expanded"
 
 def get_portfolio_summary():
     try:
-        response = requests.get(f"{BACKEND_URL}/portfolio/summary", timeout=5)
+        response = requests.get(f"{BACKEND_URL}/portfolio/summary", timeout=30)
         response.raise_for_status()
         return response.json()
     except Exception as e:
@@ -27,7 +27,7 @@ def get_portfolio_summary():
 
 def get_company_history(nip: str):
     try:
-        response = requests.get(f"{BACKEND_URL}/companies/{nip}/history", timeout=5)
+        response = requests.get(f"{BACKEND_URL}/companies/{nip}/history", timeout=30)
         if response.status_code == 404:
             return []
         response.raise_for_status()
@@ -48,14 +48,14 @@ def submit_rating(payload: dict):
         if payload.get("company_industry"):
             company_payload["industry"] = payload["company_industry"]
             
-        requests.post(f"{BACKEND_URL}/companies", json=company_payload, timeout=5).raise_for_status()
+        requests.post(f"{BACKEND_URL}/companies", json=company_payload, timeout=30).raise_for_status()
         
         # Then submit statement
         # Remove frontend-only fields
         stmt_payload = {k: v for k, v in payload.items() if not k.startswith("company_")}
         stmt_payload["company_nip"] = payload["company_nip"]
         
-        response = requests.post(f"{BACKEND_URL}/statements", json=stmt_payload, timeout=5)
+        response = requests.post(f"{BACKEND_URL}/statements", json=stmt_payload, timeout=30)
         response.raise_for_status()
         return response.json()
     except Exception as e:
