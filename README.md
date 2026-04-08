@@ -15,5 +15,4 @@ A corporate credit rating system for the Polish market using the Hołda/Mączyń
 - **Financial Ratios**: Implementation of Polish-specific bankruptcy models (Mączyńska 2006).
 
 ## Documentation
-- [DESIGN.md](./DESIGN.md): Detailed system architecture and database schema.
 - [GEMINI.md](./GEMINI.md): Project mandates, development workflow, and coding standards.
