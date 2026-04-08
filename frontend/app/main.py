@@ -1,8 +1,13 @@
 import streamlit as st
-import os
-import requests
 import pandas as pd
 import plotly.express as px
+from utils import (
+    get_portfolio_summary,
+    get_company_history,
+    submit_rating,
+    init_session_state,
+    generate_mock_data
+)
 
 st.set_page_config(
     page_title="IRB Credit Rating Engine",
@@ -10,57 +15,8 @@ st.set_page_config(
     layout="wide"
 )
 
-# Configuration
-BACKEND_URL = (os.getenv("BACKEND_URL") or "http://localhost:8000").strip().rstrip("/")
-ST_SIDEBAR_STATE = "expanded"
-
-# --- Helper Functions ---
-
-def get_portfolio_summary():
-    try:
-        response = requests.get(f"{BACKEND_URL}/portfolio/summary", timeout=30)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        st.error(f"Error fetching portfolio summary: {e}")
-        return []
-
-def get_company_history(nip: str):
-    try:
-        response = requests.get(f"{BACKEND_URL}/companies/{nip}/history", timeout=30)
-        if response.status_code == 404:
-            return []
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        st.error(f"Error fetching company history: {e}")
-        return []
-
-def submit_rating(payload: dict):
-    try:
-        # First ensure company exists/updated
-        company_payload = {
-            "nip": str(payload["company_nip"]),
-            "name": payload.get("company_name", "Unknown")
-        }
-        if payload.get("company_krs"):
-            company_payload["krs"] = str(payload["company_krs"])
-        if payload.get("company_industry"):
-            company_payload["industry"] = payload["company_industry"]
-            
-        requests.post(f"{BACKEND_URL}/companies", json=company_payload, timeout=30).raise_for_status()
-        
-        # Then submit statement
-        # Remove frontend-only fields
-        stmt_payload = {k: v for k, v in payload.items() if not k.startswith("company_")}
-        stmt_payload["company_nip"] = payload["company_nip"]
-        
-        response = requests.post(f"{BACKEND_URL}/statements", json=stmt_payload, timeout=30)
-        response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        st.error(f"Error submitting rating: {e}")
-        return None
+# Initialize session state for persistent form data
+init_session_state()
 
 # --- UI Components ---
 
@@ -141,33 +97,40 @@ elif page == "Company Analysis":
 elif page == "New Rating":
     st.header("📝 Submit New Financial Statement")
     
+    if st.button("✨ Fill with Mock Data"):
+        generate_mock_data()
+        st.rerun()
+    
     with st.form("rating_form"):
+        data = st.session_state.saved_form_data
         st.subheader("Company Information")
         c1, c2 = st.columns(2)
         with c1:
-            company_nip = st.text_input("NIP (Required)", max_chars=10)
-            company_name = st.text_input("Company Name", value="Auto-generated Name")
+            company_nip = st.text_input("NIP (Required)", max_chars=10, value=data["company_nip"])
+            company_name = st.text_input("Company Name", value=data["company_name"])
         with c2:
-            company_krs = st.text_input("KRS (Optional)", max_chars=10)
-            company_industry = st.selectbox("Industry", ["Manufacturing", "Services", "Trade", "Construction", "Other"])
+            company_krs = st.text_input("KRS (Optional)", max_chars=10, value=data["company_krs"])
+            industry_list = ["Manufacturing", "Services", "Trade", "Construction", "Other"]
+            industry_idx = industry_list.index(data["company_industry"]) if data["company_industry"] in industry_list else 0
+            company_industry = st.selectbox("Industry", industry_list, index=industry_idx)
             
         st.subheader("Financial Statement Data")
         f1, f2, f3 = st.columns(3)
         with f1:
-            fiscal_year = st.number_input("Fiscal Year", min_value=2000, max_value=2026, value=2024)
-            total_assets = st.number_input("Total Assets", min_value=0.0, format="%.2f")
-            total_liabilities = st.number_input("Total Liabilities", min_value=0.0, format="%.2f")
+            fiscal_year = st.number_input("Fiscal Year", min_value=2000, max_value=2026, value=data["fiscal_year"])
+            total_assets = st.number_input("Total Assets", min_value=0.0, format="%.2f", value=data["total_assets"])
+            total_liabilities = st.number_input("Total Liabilities", min_value=0.0, format="%.2f", value=data["total_liabilities"])
         with f2:
-            equity = st.number_input("Equity", format="%.2f")
-            current_assets = st.number_input("Current Assets", min_value=0.0, format="%.2f")
-            current_liabilities = st.number_input("Current Liabilities", min_value=0.0, format="%.2f")
+            equity = st.number_input("Equity", format="%.2f", value=data["equity"])
+            current_assets = st.number_input("Current Assets", min_value=0.0, format="%.2f", value=data["current_assets"])
+            current_liabilities = st.number_input("Current Liabilities", min_value=0.0, format="%.2f", value=data["current_liabilities"])
         with f3:
-            operating_profit = st.number_input("Operating Profit (EBIT)", format="%.2f")
-            net_profit = st.number_input("Net Profit", format="%.2f")
-            sales_revenue = st.number_input("Sales Revenue", min_value=0.0, format="%.2f")
+            operating_profit = st.number_input("Operating Profit (EBIT)", format="%.2f", value=data["operating_profit"])
+            net_profit = st.number_input("Net Profit", format="%.2f", value=data["net_profit"])
+            sales_revenue = st.number_input("Sales Revenue", min_value=0.0, format="%.2f", value=data["sales_revenue"])
 
         st.subheader("Loan Request")
-        requested_amount = st.number_input("Requested Loan Amount (PLN)", min_value=0.0, step=1000.0)
+        requested_amount = st.number_input("Requested Loan Amount (PLN)", min_value=0.0, step=1000.0, value=data["requested_amount"])
         
         # Hidden fields for model compatibility
         gross_profit = operating_profit # Approximation
@@ -176,27 +139,30 @@ elif page == "New Rating":
         submit_btn = st.form_submit_button("Generate Rating")
         
         if submit_btn:
+            # Persistent storage update
+            st.session_state.saved_form_data = {
+                "company_nip": company_nip,
+                "company_name": company_name,
+                "company_krs": company_krs,
+                "company_industry": company_industry,
+                "fiscal_year": fiscal_year,
+                "total_assets": total_assets,
+                "total_liabilities": total_liabilities,
+                "equity": equity,
+                "current_assets": current_assets,
+                "current_liabilities": current_liabilities,
+                "operating_profit": operating_profit,
+                "net_profit": net_profit,
+                "sales_revenue": sales_revenue,
+                "requested_amount": requested_amount
+            }
+
             if not company_nip or len(company_nip) != 10:
                 st.error("Valid NIP is required.")
             else:
-                payload = {
-                    "company_nip": company_nip,
-                    "company_name": company_name,
-                    "company_krs": company_krs,
-                    "company_industry": company_industry,
-                    "fiscal_year": fiscal_year,
-                    "total_assets": total_assets,
-                    "total_liabilities": total_liabilities,
-                    "equity": equity,
-                    "current_assets": current_assets,
-                    "current_liabilities": current_liabilities,
-                    "operating_profit": operating_profit,
-                    "net_profit": net_profit,
-                    "depreciation": depreciation,
-                    "gross_profit": gross_profit,
-                    "sales_revenue": sales_revenue,
-                    "requested_amount": requested_amount
-                }
+                payload = st.session_state.saved_form_data.copy()
+                payload["depreciation"] = depreciation
+                payload["gross_profit"] = gross_profit
                 
                 result = submit_rating(payload)
                 if result:
