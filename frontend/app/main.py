@@ -24,77 +24,9 @@ st.title("🏦 IRB Credit Rating & Loan Decision Engine")
 st.markdown("---")
 
 st.sidebar.header("Navigation")
-page = st.sidebar.radio("Go to", ["Dashboard", "Company Analysis", "New Rating"])
+page = st.sidebar.radio("Go to", ["New Rating", "Company History", "Dashboard"])
 
-if page == "Dashboard":
-    st.header("📊 Portfolio Risk Dashboard")
-    
-    summary_data = get_portfolio_summary()
-    
-    if summary_data:
-        df = pd.DataFrame(summary_data)
-        
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            st.subheader("Risk Distribution")
-            fig = px.pie(
-                df, 
-                values='count', 
-                names='rating_class', 
-                title='Portfolio by Rating Class',
-                color='rating_class',
-                color_discrete_sequence=px.colors.qualitative.Pastel
-            )
-            st.plotly_chart(fig, use_container_width=True)
-            
-        with col2:
-            st.subheader("Detailed Breakdown")
-            st.table(df)
-            
-        # Total Stats
-        total_cases = df['count'].sum()
-        st.metric("Total Rated Portfolios", total_cases)
-    else:
-        st.warning("No portfolio data available yet.")
-
-elif page == "Company Analysis":
-    st.header("🔍 Company Rating History")
-    
-    with st.container():
-        nip = st.text_input("Enter Company NIP (10 digits)", max_chars=10)
-        
-        if nip:
-            if len(nip) == 10 and nip.isdigit():
-                history = get_company_history(nip)
-                
-                if history:
-                    df_history = pd.DataFrame(history)
-                    df_history['created_at'] = pd.to_datetime(df_history['created_at'])
-                    
-                    st.subheader(f"History for NIP: {nip}")
-                    
-                    # Trend chart
-                    fig_trend = px.line(
-                        df_history, 
-                        x='created_at', 
-                        y='z_score', 
-                        title='Z-Score Trend (Mączyńska Model G)',
-                        markers=True
-                    )
-                    st.plotly_chart(fig_trend, use_container_width=True)
-                    
-                    # Detailed Table
-                    st.dataframe(
-                        df_history[['created_at', 'rating_class', 'z_score', 'pd_percentage', 'decision_status', 'risk_profile']],
-                        use_container_width=True
-                    )
-                else:
-                    st.info("No rating history found for this company.")
-            else:
-                st.error("Please enter a valid 10-digit NIP.")
-
-elif page == "New Rating":
+if page == "New Rating":
     st.header("📝 Submit New Financial Statement")
     
     if st.button("✨ Fill with Mock Data"):
@@ -177,3 +109,72 @@ elif page == "New Rating":
                     st.info(f"**Risk Profile:** {result.get('risk_profile', 'N/A')}")
                     if result['decision_reason']:
                         st.write(f"**Reason:** {result['decision_reason']}")
+
+elif page == "Company History":
+    st.header("🔍 Company Rating History")
+    
+    with st.container():
+        nip = st.text_input("Enter Company NIP (10 digits)", max_chars=10)
+        
+        if nip:
+            if len(nip) == 10 and nip.isdigit():
+                history = get_company_history(nip)
+                
+                if history:
+                    df_history = pd.DataFrame(history)
+                    df_history['created_at'] = pd.to_datetime(df_history['created_at'])
+                    
+                    st.subheader(f"History for NIP: {nip}")
+                    
+                    # Trend chart
+                    fig_trend = px.line(
+                        df_history, 
+                        x='created_at', 
+                        y='z_score', 
+                        title='Z-Score Trend (Mączyńska Model G)',
+                        markers=True
+                    )
+                    st.plotly_chart(fig_trend, use_container_width=True)
+                    
+                    # Detailed Table
+                    st.dataframe(
+                        df_history[['created_at', 'rating_class', 'z_score', 'pd_percentage', 'decision_status', 'risk_profile']],
+                        use_container_width=True
+                    )
+                else:
+                    st.info("No rating history found for this company.")
+            else:
+                st.error("Please enter a valid 10-digit NIP.")
+
+elif page == "Dashboard":
+    st.header("📊 Portfolio Risk Dashboard")
+    
+    summary_data = get_portfolio_summary()
+    
+    if summary_data:
+        df = pd.DataFrame(summary_data)
+        
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.subheader("Risk Distribution")
+            fig = px.pie(
+                df, 
+                values='count', 
+                names='rating_class', 
+                title='Portfolio by Rating Class',
+                color='rating_class',
+                color_discrete_sequence=px.colors.qualitative.Pastel
+            )
+            st.plotly_chart(fig, use_container_width=True)
+            
+        with col2:
+            st.subheader("Detailed Breakdown")
+            st.table(df)
+            
+        # Total Stats
+        total_cases = df['count'].sum()
+        st.metric("Total Rated Portfolios", total_cases)
+    else:
+        st.warning("No portfolio data available yet.")
+
