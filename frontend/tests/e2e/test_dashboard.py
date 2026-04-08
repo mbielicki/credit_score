@@ -19,12 +19,16 @@ def test_dashboard_navigation(page: Page):
     # Check Sidebar
     expect(page.get_by_text("Navigation")).to_be_visible()
     
-    # Go to Company Analysis
-    page.get_by_text("Company Analysis").click()
+    # Go to Company History
+    page.get_by_text("Company History", exact=True).click()
     expect(page.get_by_text("Company Rating History")).to_be_visible()
     
+    # Go to Dashboard
+    page.get_by_text("Dashboard", exact=True).click()
+    expect(page.get_by_text("Portfolio Risk Dashboard")).to_be_visible()
+    
     # Go to New Rating
-    page.get_by_text("New Rating").click()
+    page.get_by_text("New Rating", exact=True).click()
     expect(page.get_by_text("Submit New Financial Statement")).to_be_visible()
 
 def test_submit_new_rating_flow(page: Page):
