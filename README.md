@@ -62,3 +62,6 @@ This project follows a strict **Verification Protocol** (defined in [GEMINI.md](
 
 ---
 *Note: This is a portfolio project using fictional, anonymized data for demo purposes.*
+
+## 📄 License
+This project is licensed under the **GNU General Public License v3.0**. See the [LICENSE](./LICENSE) file for the full text.

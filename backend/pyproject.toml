@@ -3,6 +3,7 @@ name = "credit-score-backend"
 version = "0.1.0"
 description = "FastAPI backend for IRB Credit Rating Engine"
 authors = [{ name = "Analyst", email = "analyst@example.com" }]
+license = { text = "GPL-3.0-or-later" }
 requires-python = ">=3.14"
 dependencies = [
     "fastapi==0.135.3",
